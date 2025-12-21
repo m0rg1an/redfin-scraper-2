@@ -63,3 +63,7 @@ Redfin may rate-limit or block scraping. This project:
 
 If you still get blocked, reduce frequency, add longer delays, and run from a stable IP.
 
+## About missing fields
+
+Some fields you want (like **MLS listing id** and **zoning**) are not always present on Redfin search result pages. This scraper fills them when they appear in the embedded page JSON, otherwise leaves them blank.
+
