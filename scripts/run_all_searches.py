@@ -3,10 +3,13 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import os
+import random
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import yaml
+import requests
 
 from http_client import fetch_html
 from redfin_scraper import Listing, parse_redfin_search_results
@@ -185,10 +188,13 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
     out_path = os.path.join(out_dir, "all_listings.csv")
 
     consolidated: List[Dict[str, Any]] = []
+    session = requests.Session()
 
     for s in searches:
         print(f"\n=== Search {s.search_id} | {s.category} | {s.city} ===")
-        result = fetch_html(s.url)
+        # small jitter helps avoid tripping simplistic rate limits (common in Codespaces)
+        time.sleep(random.uniform(0.8, 2.5))
+        result = fetch_html(s.url, session=session, max_attempts=8)
         print(f"Fetched {result.status_code} in {result.elapsed_s:.2f}s")
         if result.status_code != 200:
             print("Skipping due to non-200 response.")

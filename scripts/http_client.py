@@ -59,6 +59,11 @@ def fetch_html(
             "Pragma": "no-cache",
             "DNT": "1",
             "Upgrade-Insecure-Requests": "1",
+            "Referer": "https://www.redfin.com/",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-User": "?1",
         }
         t0 = time.time()
         try:
@@ -68,7 +73,13 @@ def fetch_html(
                 return FetchResult(url=url, status_code=resp.status_code, text=resp.text, elapsed_s=elapsed)
 
             # Retryable statuses: rate limit, forbidden, transient server errors
-            if resp.status_code in (403, 429, 500, 502, 503, 504):
+            if resp.status_code in (403, 405, 429, 500, 502, 503, 504):
+                # "Warm up" cookies on block-like responses (helps in some environments)
+                if resp.status_code in (403, 405, 429):
+                    try:
+                        sess.get("https://www.redfin.com/", headers=headers, timeout=timeout_s)
+                    except Exception:
+                        pass
                 sleep_s = backoff_base_s * (backoff_multiplier ** (attempt - 1))
                 _sleep_with_jitter(sleep_s)
                 continue
