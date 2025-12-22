@@ -189,13 +189,36 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
 
     consolidated: List[Dict[str, Any]] = []
     session = requests.Session()
+    verbose_fetch = os.getenv("REDFIN_VERBOSE", "").strip().lower() in ("1", "true", "yes", "y")
+    try:
+        timeout_s = float(os.getenv("REDFIN_TIMEOUT_S", "25").strip())
+    except Exception:
+        timeout_s = 25.0
+    try:
+        max_attempts = int(os.getenv("REDFIN_MAX_ATTEMPTS", "8").strip())
+    except Exception:
+        max_attempts = 8
+    try:
+        min_delay = float(os.getenv("REDFIN_MIN_DELAY_S", "0.8").strip())
+        max_delay = float(os.getenv("REDFIN_MAX_DELAY_S", "2.5").strip())
+    except Exception:
+        min_delay, max_delay = 0.8, 2.5
 
     for s in searches:
         print(f"\n=== Search {s.search_id} | {s.category} | {s.city} ===")
         # small jitter helps avoid tripping simplistic rate limits (common in Codespaces)
-        time.sleep(random.uniform(0.8, 2.5))
+        sleep_s = random.uniform(min_delay, max_delay)
+        if verbose_fetch:
+            print(f"[runner] pre-fetch sleep {sleep_s:.2f}s")
+        time.sleep(sleep_s)
         try:
-            result = fetch_html(s.url, session=session, max_attempts=8)
+            result = fetch_html(
+                s.url,
+                session=session,
+                max_attempts=max_attempts,
+                timeout_s=timeout_s,
+                verbose=verbose_fetch,
+            )
         except RuntimeError as exc:
             print(f"Fetch failed; skipping search_id={s.search_id}. {exc}")
             continue

@@ -40,6 +40,7 @@ def fetch_html(
     backoff_base_s: float = 1.2,
     backoff_multiplier: float = 1.8,
     raise_on_failure: bool = True,
+    verbose: bool = False,
 ) -> FetchResult:
     """
     Fetch HTML with rotating user agents and exponential backoff.
@@ -72,6 +73,8 @@ def fetch_html(
         }
         t0 = time.time()
         try:
+            if verbose:
+                print(f"[fetch] attempt {attempt}/{max_attempts}: GET {url}")
             resp = sess.get(url, headers=headers, timeout=timeout_s)
             elapsed = time.time() - t0
             last_status = resp.status_code
@@ -89,6 +92,8 @@ def fetch_html(
                     except Exception:
                         pass
                 sleep_s = backoff_base_s * (backoff_multiplier ** (attempt - 1))
+                if verbose:
+                    print(f"[fetch] got HTTP {resp.status_code}; retrying after {sleep_s:.1f}s")
                 _sleep_with_jitter(sleep_s)
                 continue
 
@@ -97,6 +102,8 @@ def fetch_html(
         except (requests.Timeout, requests.ConnectionError, requests.SSLError) as exc:
             last_exc = exc
             sleep_s = backoff_base_s * (backoff_multiplier ** (attempt - 1))
+            if verbose:
+                print(f"[fetch] error {type(exc).__name__}: {exc}; retrying after {sleep_s:.1f}s")
             _sleep_with_jitter(sleep_s)
             continue
 
