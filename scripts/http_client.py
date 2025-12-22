@@ -23,6 +23,7 @@ class FetchResult:
     status_code: int
     text: str
     elapsed_s: float
+    error: Optional[str] = None
 
 
 def _sleep_with_jitter(base_s: float, jitter_s: float = 0.25) -> None:
@@ -38,6 +39,7 @@ def fetch_html(
     max_attempts: int = 6,
     backoff_base_s: float = 1.2,
     backoff_multiplier: float = 1.8,
+    raise_on_failure: bool = True,
 ) -> FetchResult:
     """
     Fetch HTML with rotating user agents and exponential backoff.
@@ -49,6 +51,9 @@ def fetch_html(
 
     sess = session or requests.Session()
     last_exc: Optional[Exception] = None
+    last_status: Optional[int] = None
+    last_text: str = ""
+    last_elapsed: float = 0.0
 
     for attempt in range(1, max_attempts + 1):
         headers = {
@@ -69,6 +74,9 @@ def fetch_html(
         try:
             resp = sess.get(url, headers=headers, timeout=timeout_s)
             elapsed = time.time() - t0
+            last_status = resp.status_code
+            last_elapsed = elapsed
+            last_text = resp.text or ""
             if resp.status_code in (200,):
                 return FetchResult(url=url, status_code=resp.status_code, text=resp.text, elapsed_s=elapsed)
 
@@ -86,11 +94,27 @@ def fetch_html(
 
             # Non-retryable
             return FetchResult(url=url, status_code=resp.status_code, text=resp.text, elapsed_s=elapsed)
-        except (requests.Timeout, requests.ConnectionError) as exc:
+        except (requests.Timeout, requests.ConnectionError, requests.SSLError) as exc:
             last_exc = exc
             sleep_s = backoff_base_s * (backoff_multiplier ** (attempt - 1))
             _sleep_with_jitter(sleep_s)
             continue
 
-    raise RuntimeError(f"Failed to fetch {url} after {max_attempts} attempts") from last_exc
+    msg_parts = [f"Failed to fetch {url} after {max_attempts} attempts"]
+    if last_status is not None:
+        msg_parts.append(f"(last HTTP status: {last_status})")
+    if last_exc is not None:
+        msg_parts.append(f"(last error: {type(last_exc).__name__}: {last_exc})")
+    msg = " ".join(msg_parts)
+
+    if raise_on_failure:
+        raise RuntimeError(msg) from last_exc
+
+    return FetchResult(
+        url=url,
+        status_code=last_status or 0,
+        text=last_text,
+        elapsed_s=last_elapsed,
+        error=msg,
+    )
 

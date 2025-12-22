@@ -194,7 +194,11 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
         print(f"\n=== Search {s.search_id} | {s.category} | {s.city} ===")
         # small jitter helps avoid tripping simplistic rate limits (common in Codespaces)
         time.sleep(random.uniform(0.8, 2.5))
-        result = fetch_html(s.url, session=session, max_attempts=8)
+        try:
+            result = fetch_html(s.url, session=session, max_attempts=8)
+        except RuntimeError as exc:
+            print(f"Fetch failed; skipping search_id={s.search_id}. {exc}")
+            continue
         print(f"Fetched {result.status_code} in {result.elapsed_s:.2f}s")
         if result.status_code != 200:
             print("Skipping due to non-200 response.")
