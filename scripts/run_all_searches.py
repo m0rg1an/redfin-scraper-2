@@ -182,6 +182,46 @@ def listing_to_row(search: SearchDef, listing: Listing) -> Dict[str, Any]:
     }
 
 
+def preflight_or_exit(
+    *,
+    session: requests.Session,
+    timeout_s: float,
+    verbose: bool,
+) -> None:
+    """
+    Fail fast when the runtime environment is blocked (common in Codespaces),
+    instead of retrying each search and writing an empty CSV.
+    """
+    test_url = "https://www.redfin.com/"
+    if verbose:
+        print(f"[preflight] checking access: {test_url}")
+    res = fetch_html(
+        test_url,
+        session=session,
+        timeout_s=timeout_s,
+        max_attempts=2,
+        raise_on_failure=False,
+        verbose=verbose,
+    )
+    if res.status_code in (403, 405, 429):
+        raise SystemExit(
+            "\n".join(
+                [
+                    f"Preflight failed: Redfin returned HTTP {res.status_code} from this environment.",
+                    "",
+                    "This commonly happens from GitHub Codespaces / cloud IP ranges.",
+                    "Workarounds:",
+                    "  - Run locally (home IP) or on a non-GitHub-hosted machine",
+                    "  - Use an HTTP(S) proxy in this shell, e.g.:",
+                    '      export HTTPS_PROXY="http://USER:PASS@HOST:PORT"',
+                    '      export HTTP_PROXY="$HTTPS_PROXY"',
+                    "",
+                    "After setting a proxy, rerun the script.",
+                ]
+            )
+        )
+
+
 def run_all(*, config_path: str = "config/searches.yaml") -> str:
     searches = load_searches(config_path)
     out_dir = daily_output_dir("output")
@@ -203,6 +243,8 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
         max_delay = float(os.getenv("REDFIN_MAX_DELAY_S", "2.5").strip())
     except Exception:
         min_delay, max_delay = 0.8, 2.5
+
+    preflight_or_exit(session=session, timeout_s=timeout_s, verbose=verbose_fetch)
 
     for s in searches:
         print(f"\n=== Search {s.search_id} | {s.category} | {s.city} ===")

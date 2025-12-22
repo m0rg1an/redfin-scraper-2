@@ -67,3 +67,7 @@ If you still get blocked, reduce frequency, add longer delays, and run from a st
 
 Some fields you want (like **MLS listing id** and **zoning**) are not always present on Redfin search result pages. This scraper fills them when they appear in the embedded page JSON, otherwise leaves them blank.
 
+## Codespaces note
+
+If you run this from GitHub Codespaces and immediately see HTTP 403/405/429 errors, Redfin is likely blocking the Codespaces IP range. Use a proxy (via `HTTPS_PROXY` / `HTTP_PROXY`) or run from a non-GitHub-hosted environment.
+
