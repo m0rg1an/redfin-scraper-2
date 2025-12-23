@@ -22,8 +22,18 @@ class Listing:
     raw: Dict[str, Any]
 
 
+def _unwrap_value(val: Any) -> Any:
+    """
+    Redfin often wraps scalars as {"value": X, "level": N}.
+    """
+    if isinstance(val, dict) and "value" in val and len(val) <= 4:
+        return val.get("value")
+    return val
+
+
 def _safe_int(val: Any) -> Optional[int]:
     try:
+        val = _unwrap_value(val)
         if val is None:
             return None
         if isinstance(val, bool):
@@ -132,6 +142,99 @@ def _find_braced_json_candidates(text: str, *, max_candidates: int = 6) -> List[
     return out
 
 
+def _extract_initial_context_from_scripts(html: str) -> List[Dict[str, Any]]:
+    """
+    Redfin pages often embed a big JSON blob at:
+      root.__reactServerState.InitialContext = {...};
+    This includes cached Stingray responses containing the actual listing details.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    out: List[Dict[str, Any]] = []
+
+    marker = "InitialContext ="
+    for script in soup.find_all("script"):
+        txt = script.string
+        if not txt or marker not in txt:
+            continue
+        # Brace-match the JSON object after the marker
+        start0 = txt.find(marker)
+        start = txt.find("{", start0)
+        if start == -1:
+            continue
+        depth = 0
+        in_str = False
+        esc = False
+        end: Optional[int] = None
+        for i in range(start, len(txt)):
+            ch = txt[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+        if end is None:
+            continue
+        blob = txt[start:end]
+        try:
+            obj = json.loads(blob)
+            if isinstance(obj, dict):
+                out.append(obj)
+        except Exception:
+            continue
+
+    return out
+
+
+def _strip_non_json_prefix(s: str) -> str:
+    # Redfin commonly prefixes Stingray JSON responses with "{}&&"
+    if "&&" in s[:30]:
+        s = s.split("&&", 1)[1]
+    for i, ch in enumerate(s):
+        if ch in "{[":
+            return s[i:]
+    return s
+
+
+def _extract_stingray_json_from_initial_context(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Pull cached Stingray responses (especially /stingray/api/gis) from InitialContext.
+    """
+    out: List[Dict[str, Any]] = []
+    cache = (ctx.get("ReactServerAgent.cache") or {}).get("dataCache") or {}
+    if not isinstance(cache, dict):
+        return out
+
+    for key, entry in cache.items():
+        if not isinstance(key, str) or "/stingray/api/" not in key:
+            continue
+        res = (entry or {}).get("res") or {}
+        text = res.get("text")
+        if not isinstance(text, str) or not text:
+            continue
+        # GIS is the search-results payload that includes sqFt/lotSqFt/etc
+        if "/stingray/api/gis" not in key:
+            continue
+        try:
+            obj = json.loads(_strip_non_json_prefix(text))
+            if isinstance(obj, dict):
+                out.append(obj)
+        except Exception:
+            continue
+    return out
+
+
 def _walk(obj: Any) -> Iterable[Any]:
     stack = [obj]
     while stack:
@@ -166,18 +269,18 @@ def _best_effort_extract_listings_from_json(blobs: List[Dict[str, Any]]) -> List
                 continue
 
             # normalize possible shapes
-            url = node.get("url") or node.get("URL") or node.get("listingUrl")
+            url = _unwrap_value(node.get("url") or node.get("URL") or node.get("listingUrl"))
             if isinstance(url, str) and url and url in seen_urls:
                 continue
 
             price = _safe_int(node.get("price") or node.get("listPrice") or node.get("value"))
-            street = node.get("streetLine") or node.get("address") or node.get("streetAddress")
-            city = node.get("city")
+            street = _unwrap_value(node.get("streetLine") or node.get("address") or node.get("streetAddress"))
+            city = _unwrap_value(node.get("city"))
             addr = None
             if isinstance(street, str):
                 addr = street
             elif isinstance(street, dict):
-                addr = street.get("streetAddress") or street.get("name")
+                addr = _unwrap_value(street.get("streetAddress") or street.get("name") or street.get("value"))
 
             # sqft fields vary
             home_sqft = _safe_int(
@@ -187,13 +290,15 @@ def _best_effort_extract_listings_from_json(blobs: List[Dict[str, Any]]) -> List
                 or node.get("livingAreaSqFt")
                 or node.get("sqftValue")
             )
-            lot_sqft = _safe_int(node.get("lotSqFt") or node.get("lotSize") or node.get("lotSizeSqFt"))
+            lot_sqft = _safe_int(node.get("lotSqFt") or node.get("lotSize") or node.get("lotSizeSqFt") or node.get("parcelSize"))
 
-            mls_id = node.get("mlsId") or node.get("mlsListingId") or node.get("listingId") or node.get("id")
+            mls_id = _unwrap_value(node.get("mlsId") or node.get("mlsListingId") or node.get("listingId") or node.get("id"))
+            if isinstance(mls_id, dict) and "value" in mls_id:
+                mls_id = mls_id.get("value")
             if mls_id is not None and not isinstance(mls_id, str):
                 mls_id = str(mls_id)
 
-            zoning = node.get("zoning") or node.get("zoningCode") or None
+            zoning = _unwrap_value(node.get("zoning") or node.get("zoningCode") or None)
             if zoning is not None and not isinstance(zoning, str):
                 zoning = str(zoning)
 
@@ -290,8 +395,19 @@ def parse_redfin_search_results(html: str, *, base_url: str = "https://www.redfi
     - fallback to simple HTML card scraping (worst)
     """
     blobs = _extract_json_blobs_from_scripts(html)
-    listings = _best_effort_extract_listings_from_json(blobs)
-    meta: Dict[str, Any] = {"json_blobs_found": len(blobs), "listings_from_json": len(listings)}
+    initial_contexts = _extract_initial_context_from_scripts(html)
+    stingray_blobs: List[Dict[str, Any]] = []
+    for ctx in initial_contexts:
+        stingray_blobs.extend(_extract_stingray_json_from_initial_context(ctx))
+
+    all_blobs = blobs + initial_contexts + stingray_blobs
+    listings = _best_effort_extract_listings_from_json(all_blobs)
+    meta: Dict[str, Any] = {
+        "json_blobs_found": len(blobs),
+        "initial_contexts_found": len(initial_contexts),
+        "stingray_blobs_found": len(stingray_blobs),
+        "listings_from_json": len(listings),
+    }
 
     if not listings:
         listings = _extract_listings_from_html_cards(html, base_url=base_url)
