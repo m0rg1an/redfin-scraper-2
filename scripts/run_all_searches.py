@@ -233,6 +233,7 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
     out_path = os.path.join(out_dir, "all_listings.csv")
 
     consolidated: List[Dict[str, Any]] = []
+    seen_listing_urls: set[str] = set()
     session = requests.Session()
     verbose_fetch = os.getenv("REDFIN_VERBOSE", "").strip().lower() in ("1", "true", "yes", "y")
     try:
@@ -278,12 +279,23 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
         print(f"Parsed listings: {len(listings)} (meta: {meta})")
 
         kept = 0
+        deduped = 0
         for l in listings:
             if not passes_dadu_keyword_filter(s, l):
                 continue
-            consolidated.append(listing_to_row(s, l))
+            row = listing_to_row(s, l)
+            listing_url = (row.get("listing_url") or "").strip()
+            if listing_url:
+                if listing_url in seen_listing_urls:
+                    deduped += 1
+                    continue
+                seen_listing_urls.add(listing_url)
+            consolidated.append(row)
             kept += 1
-        print(f"Kept after filters: {kept}")
+        if deduped:
+            print(f"Kept after filters: {kept} (deduped {deduped} by listing_url)")
+        else:
+            print(f"Kept after filters: {kept}")
 
     write_consolidated_csv(consolidated, out_path)
     print(f"\nWrote {len(consolidated)} rows -> {out_path}")
