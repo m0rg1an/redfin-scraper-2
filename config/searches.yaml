@@ -26,31 +26,31 @@ searches:
   - search_id: 5
     category: Corner_Lot
     city: Tacoma
-    description: "Corner lots; good DADU/ADU potential."
+    description: "Corner lots and good DADU/ADU potential."
     url: "https://www.redfin.com/city/17887/WA/Tacoma/filter/property-type=house+multifamily,max-price=550k,max-year-built=1980,remarks=Corner,min-lot-size=6k-sqft,hoa=0"
 
   - search_id: 6
     category: DADU_play
     city: Tacoma
-    description: "Large cheap lot with a house; DADU potential."
+    description: "Large cheap lot with a house DADU potential."
     url: "https://www.redfin.com/city/17887/WA/Tacoma/filter/property-type=house+multifamily,max-price=400k,min-lot-size=6k-sqft,hoa=0"
 
   - search_id: 7
     category: Fix_n_flip
     city: Tacoma
-    description: "Cheap fix and flip; low $/sqft."
+    description: "Cheap fix and flip and low $/sqft."
     url: "https://www.redfin.com/city/17887/WA/Tacoma/filter/property-type=house+multifamily,max-price=400k,max-price-per-sqft=250-sqft,max-year-built=1999,hoa=0"
 
   - search_id: 8
     category: Fix_n_flip
     city: Burien
-    description: "Cheap fix and flip; low $/sqft."
+    description: "Cheap fix and flip low $/sqft."
     url: "https://www.redfin.com/city/2291/WA/Burien/filter/property-type=house+multifamily,max-price=400k,max-price-per-sqft=250-sqft,max-year-built=1999,hoa=0"
 
   - search_id: 9
     category: Fix_n_flip
     city: Tukwila
-    description: "Cheap fix and flip; low $/sqft."
+    description: "Cheap fix and flip low $/sqft."
     url: "https://www.redfin.com/city/18534/WA/Tukwila/filter/property-type=house+multifamily,max-price=400k,max-price-per-sqft=250-sqft,max-year-built=1999,hoa=0"
 
   - search_id: 10
