@@ -39,6 +39,7 @@ python scripts/run_all_searches.py
 
 The consolidated CSV includes (when available from Redfin HTML):
 
+- `tax_parcel_number` (from `lookups/parcel/*.csv` if provided)
 - `mls_listing_id`
 - `search_id`
 - `search_category`

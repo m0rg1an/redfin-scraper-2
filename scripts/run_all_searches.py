@@ -12,6 +12,7 @@ import yaml
 import requests
 
 from http_client import fetch_html
+from parcel_lookup import load_parcel_lookup
 from redfin_scraper import Listing, parse_redfin_search_results
 
 
@@ -128,12 +129,16 @@ def daily_output_dir(root: str = "output", *, date: Optional[dt.date] = None) ->
 
 def write_consolidated_csv(rows: List[Dict[str, Any]], path: str) -> None:
     fieldnames = [
+        "tax_parcel_number",
         "mls_listing_id",
         "search_id",
         "search_category",
         "city",
         "listing_city",
         "search_city",
+        "zipcode",
+        "listing_zipcode",
+        "search_zipcode",
         "address",
         "listing_price",
         "home_sqft",
@@ -159,6 +164,7 @@ def listing_to_row(search: SearchDef, listing: Listing) -> Dict[str, Any]:
     home_ppsf = compute_price_per_sqft(listing.price, listing.home_sqft)
     lot_ppsf = compute_price_per_sqft(listing.price, listing.lot_sqft)
     return {
+        "tax_parcel_number": None,  # filled later via lookup
         "mls_listing_id": listing.mls_listing_id,
         "search_id": search.search_id,
         "search_category": search.category,
@@ -166,6 +172,9 @@ def listing_to_row(search: SearchDef, listing: Listing) -> Dict[str, Any]:
         "city": listing.city or search.city,
         "listing_city": listing.city,
         "search_city": search.city,
+        "zipcode": listing.zipcode,
+        "listing_zipcode": listing.zipcode,
+        "search_zipcode": None,
         "address": listing.address,
         "listing_price": listing.price,
         "home_sqft": listing.home_sqft,
@@ -235,6 +244,7 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
     consolidated: List[Dict[str, Any]] = []
     seen_listing_urls: set[str] = set()
     session = requests.Session()
+    parcel_lookup = load_parcel_lookup()
     verbose_fetch = os.getenv("REDFIN_VERBOSE", "").strip().lower() in ("1", "true", "yes", "y")
     try:
         timeout_s = float(os.getenv("REDFIN_TIMEOUT_S", "25").strip())
@@ -284,6 +294,10 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
             if not passes_dadu_keyword_filter(s, l):
                 continue
             row = listing_to_row(s, l)
+
+            # Enrich with tax parcel number (if a lookup CSV is provided)
+            row["tax_parcel_number"] = parcel_lookup.find(zipcode=l.zipcode, site_address=l.address)
+
             listing_url = (row.get("listing_url") or "").strip()
             if listing_url:
                 if listing_url in seen_listing_urls:

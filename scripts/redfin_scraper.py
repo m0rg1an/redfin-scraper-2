@@ -14,6 +14,8 @@ class Listing:
     mls_listing_id: Optional[str]
     address: Optional[str]
     city: Optional[str]
+    state: Optional[str]
+    zipcode: Optional[str]
     price: Optional[int]
     home_sqft: Optional[int]
     lot_sqft: Optional[int]
@@ -282,6 +284,15 @@ def _best_effort_extract_listings_from_json(blobs: List[Dict[str, Any]]) -> List
             elif isinstance(street, dict):
                 addr = _unwrap_value(street.get("streetAddress") or street.get("name") or street.get("value"))
 
+            state = _unwrap_value(node.get("state") or node.get("stateCode"))
+            zipcode = _unwrap_value(node.get("zip") or node.get("postalCode"))
+            if isinstance(zipcode, dict) and "value" in zipcode:
+                zipcode = zipcode.get("value")
+            if state is not None and not isinstance(state, str):
+                state = str(state)
+            if zipcode is not None and not isinstance(zipcode, str):
+                zipcode = str(zipcode)
+
             # sqft fields vary
             home_sqft = _safe_int(
                 node.get("sqFt")
@@ -313,6 +324,8 @@ def _best_effort_extract_listings_from_json(blobs: List[Dict[str, Any]]) -> List
                     mls_listing_id=mls_id if isinstance(mls_id, str) else None,
                     address=addr if isinstance(addr, str) else None,
                     city=city if isinstance(city, str) else None,
+                    state=state if isinstance(state, str) else None,
+                    zipcode=zipcode if isinstance(zipcode, str) else None,
                     price=price,
                     home_sqft=home_sqft,
                     lot_sqft=lot_sqft,
@@ -370,6 +383,8 @@ def _extract_listings_from_html_cards(html: str, base_url: str) -> List[Listing]
                 mls_listing_id=None,
                 address=addr,
                 city=None,
+                state=None,
+                zipcode=None,
                 price=price,
                 home_sqft=None,
                 lot_sqft=None,
@@ -424,6 +439,8 @@ def parse_redfin_search_results(html: str, *, base_url: str = "https://www.redfi
                 mls_listing_id=l.mls_listing_id,
                 address=l.address,
                 city=l.city,
+                state=l.state,
+                zipcode=l.zipcode,
                 price=l.price,
                 home_sqft=l.home_sqft,
                 lot_sqft=l.lot_sqft,
