@@ -296,7 +296,7 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
             row = listing_to_row(s, l)
 
             # Enrich with tax parcel number (if a lookup CSV is provided)
-            row["tax_parcel_number"] = parcel_lookup.find(zipcode=l.zipcode, site_address=l.address)
+            row["tax_parcel_number"] = parcel_lookup.find(zipcode=l.zipcode, site_address=l.address, zip_tolerance=4)
 
             listing_url = (row.get("listing_url") or "").strip()
             if listing_url:

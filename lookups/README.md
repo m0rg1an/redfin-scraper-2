@@ -23,5 +23,5 @@ taxparcelnumber,zipcode,site_address
 ```
 
 Matching is done by `(zipcode, normalized site_address)`. If you add multiple files,
-they are merged; the first match wins.
+they are merged; matches are primarily by **normalized address**, with zipcode allowed to differ by **±4** (closest zip wins).
 
