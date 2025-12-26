@@ -12,6 +12,7 @@ import yaml
 import requests
 
 from http_client import fetch_html
+from location_value_lookup import load_location_value_lookup
 from parcel_lookup import load_parcel_lookup
 from redfin_scraper import Listing, parse_redfin_search_results
 
@@ -129,6 +130,7 @@ def daily_output_dir(root: str = "output", *, date: Optional[dt.date] = None) ->
 
 def write_consolidated_csv(rows: List[Dict[str, Any]], path: str) -> None:
     fieldnames = [
+        "location_value",
         "tax_parcel_number",
         "mls_listing_id",
         "search_id",
@@ -164,6 +166,7 @@ def listing_to_row(search: SearchDef, listing: Listing) -> Dict[str, Any]:
     home_ppsf = compute_price_per_sqft(listing.price, listing.home_sqft)
     lot_ppsf = compute_price_per_sqft(listing.price, listing.lot_sqft)
     return {
+        "location_value": None,  # filled later via lookup
         "tax_parcel_number": None,  # filled later via lookup
         "mls_listing_id": listing.mls_listing_id,
         "search_id": search.search_id,
@@ -245,6 +248,7 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
     seen_listing_urls: set[str] = set()
     session = requests.Session()
     parcel_lookup = load_parcel_lookup()
+    location_lookup = load_location_value_lookup()
     verbose_fetch = os.getenv("REDFIN_VERBOSE", "").strip().lower() in ("1", "true", "yes", "y")
     try:
         timeout_s = float(os.getenv("REDFIN_TIMEOUT_S", "25").strip())
@@ -297,6 +301,7 @@ def run_all(*, config_path: str = "config/searches.yaml") -> str:
 
             # Enrich with tax parcel number (if a lookup CSV is provided)
             row["tax_parcel_number"] = parcel_lookup.find(zipcode=l.zipcode, site_address=l.address, zip_tolerance=4)
+            row["location_value"] = location_lookup.find(row["tax_parcel_number"])
 
             listing_url = (row.get("listing_url") or "").strip()
             if listing_url:

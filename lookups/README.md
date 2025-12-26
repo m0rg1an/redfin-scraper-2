@@ -25,3 +25,19 @@ taxparcelnumber,zipcode,site_address
 Matching is done by `(zipcode, normalized site_address)`. If you add multiple files,
 they are merged; matches are primarily by **normalized address**, with zipcode allowed to differ by **±4** (closest zip wins).
 
+## Location value lookup
+
+If you have a separate “location value” file keyed by tax parcel number, add one or more CSV files under:
+
+- `lookups/location/`
+
+Each CSV should include:
+
+- `taxparcelnumber`
+- a value column:
+  - preferred: `location_value`
+  - fallback: `value`
+  - or (if the file only has one non-tax column) that column is used as the value
+
+The runner will write `location_value` into the daily output CSV when a parcel match is found.
+
