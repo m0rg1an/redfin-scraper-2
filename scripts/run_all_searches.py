@@ -135,7 +135,6 @@ def write_consolidated_csv(rows: List[Dict[str, Any]], path: str) -> None:
         "mls_listing_id",
         "search_id",
         "search_category",
-        "city",
         "listing_city",
         "search_city",
         "listing_zipcode",
@@ -170,8 +169,6 @@ def listing_to_row(search: SearchDef, listing: Listing) -> Dict[str, Any]:
         "mls_listing_id": listing.mls_listing_id,
         "search_id": search.search_id,
         "search_category": search.category,
-        # 'city' is the listing's city when available; keep search city separately.
-        "city": listing.city or search.city,
         "listing_city": listing.city,
         "search_city": search.city,
         "listing_zipcode": listing.zipcode,

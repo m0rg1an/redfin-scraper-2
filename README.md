@@ -44,7 +44,6 @@ The consolidated CSV includes (when available from Redfin HTML):
 - `mls_listing_id`
 - `search_id`
 - `search_category`
-- `city` (listing city when available)
 - `search_city`
 - `address`
 - `listing_price`
