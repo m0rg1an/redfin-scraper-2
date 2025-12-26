@@ -31,16 +31,25 @@ class LocationValueLookup:
         return self.by_parcel.get(k)
 
 
-def load_location_value_lookup(*, lookups_dir: str = "lookups/location") -> LocationValueLookup:
+def load_location_value_lookup(
+    *,
+    lookups_dirs: Iterable[str] = ("lookups/location", "lookups/Location"),
+) -> LocationValueLookup:
     """
     Loads all CSV files in lookups/location (excluding *.csv.example) and builds:
       taxparcelnumber -> location_value
     """
     mapping: Dict[str, str] = {}
-    if not os.path.isdir(lookups_dir):
+
+    dirs = [d for d in lookups_dirs if isinstance(d, str) and os.path.isdir(d)]
+    if not dirs:
         return LocationValueLookup(by_parcel=mapping)
 
-    for path in sorted(_iter_csv_files(lookups_dir)):
+    paths: list[str] = []
+    for d in dirs:
+        paths.extend(list(_iter_csv_files(d)))
+
+    for path in sorted(set(paths)):
         with open(path, "r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             if not reader.fieldnames:

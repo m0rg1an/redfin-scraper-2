@@ -30,6 +30,7 @@ they are merged; matches are primarily by **normalized address**, with zipcode a
 If you have a separate “location value” file keyed by tax parcel number, add one or more CSV files under:
 
 - `lookups/location/`
+- `lookups/Location/` (also supported)
 
 Each CSV should include:
 
